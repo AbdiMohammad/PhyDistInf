@@ -1,0 +1,24 @@
+{
+    "PSNR": 12,
+    "dataset": "cifar10",
+    "model": "resnet56",
+    "reference_pretrained_weights_path": "resource/cifar_pretrained/resnet56-4bfd9763.th",
+    "batch_size": 1024,
+    "n_epochs": 300,
+    "pretrained_weights_path": null,
+    "save_weights_after_train": true,
+    "codebook_lr": 0.001,
+    "non_codebook_lr": 0.0001,
+    "output_folder": "output/base_experiment_resnet56",
+    "codebooks":[
+        {
+            "layer": "layer1[8]",
+            "hidden_dim": 16,
+            "codebook_size": 16,
+            "beta": "LinearCoefficient(1e-4, 1e-3)",
+            "prune_epochs": [85, 95, 105, 115],
+            "prune_value": 8,
+            "prune_value_type": "number"
+        }
+    ]
+}

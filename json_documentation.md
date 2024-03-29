@@ -1,0 +1,19 @@
+- `PSNR`: Channel PSNR
+- `dataset`: dataset to use for training. Can be `cifar10` or `imagenet`
+- `model`: pretrained model to use. If `dataset` is `cifar10` then possible values are: [`resnet20`, `resnet32`, `resnet44`, `resnet56`, `resnet110`, `resnet1202`]. If `dataset` is `imagenet` then possible values are: [`resnet34`, `resnet50`, `resnet101`, `resnet152`]
+- `reference_pretrained_weights_path`: you should specify the path for pretrained weights. You can downlaod the weights for CIFAR10 here: https://github.com/akamaster/pytorch_resnet_cifar10/tree/master
+- `batch_size`, `n_epochs`: self-explainatory
+- `pretrained_weights_path`: [optional] path to pretrained weights from a previous run of the program which created a modified version of resnet with codebooks (weights saved if `save_weights_after_train` is set)
+- `save_weights_after_train`: [optional] save the model parameters (fine-tuned resnet and codebook weights) to the specified `output_folder`
+- `codebook_lr`: learning rate used for codebook parameters
+- `non_codebook_lr`: learning rate used for non-codebook parameters
+- `output_folder`: path used to save outputs (e.g. training and validation data during training)
+
+- `codebooks`: a list of codebook definitions each codebook has the following attributes: `layer`, `hidden_dim`, `codebook_size`, `beta`, `prune_epochs`, `prune_value`, `prune_value_type`
+- `codebooks.layer`: specifies the layer of pretrained network after which the codebook is inserted. The syntax is the same python syntax that you would use in python to access the layer. For example suppose we want to insert a codebook after the first block of the first layer. We would access this block in python thusly: `model.layer1[0]`. So in ordr to insert a codebook after this layer we should set `layer` to be `layer1[0]`.
+- `codebooks.hidden_dim`: the codebook embedding dimension
+- `codebooks.codebook_size`: number of codebook hidden embeddings
+- `codebooks.beta`: beta schedule for the codebook (beta is the entropy regularization factor). Can be `ConstantBeta(beta)` or `LinearBeta(begin_beta, end_beta)`.
+- `prune_epochs`: epochs before which we prune the codebook
+- `prune_value`: specifies the number or percentage of codebook entries to be pruned in total. The codebook is pruned gradually after each epoch specified in `prune_epochs` to meet this value.
+- `prune_value_type`: determines the type of `prune_value`. Can be `number` or `percentage`

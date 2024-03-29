@@ -1,0 +1,6 @@
+__pycache__/
+output/
+runs/
+.vscode/
+dataset/cifar10
+.temp/
