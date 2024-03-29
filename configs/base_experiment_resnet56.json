@@ -2,7 +2,7 @@
     "PSNR": 12,
     "dataset": "cifar10",
     "model": "resnet56",
-    "reference_pretrained_weights_path": "resource/cifar_pretrained/resnet56-4bfd9763.th",
+    "reference_pretrained_weights_path": "resource/cifar_pretrained/resnet56.th",
     "batch_size": 1024,
     "n_epochs": 300,
     "pretrained_weights_path": null,
