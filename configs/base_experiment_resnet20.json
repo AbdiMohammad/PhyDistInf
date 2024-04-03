@@ -2,14 +2,14 @@
     "PSNR": 12,
     "dataset": "cifar10",
     "model": "resnet20",
-    "reference_pretrained_weights_path": "resource/cifar_pretrained/resnet20.th",
+    "reference_pretrained_weights_dir": "resource/cifar_pretrained",
     "batch_size": 1024,
     "n_epochs": 300,
     "pretrained_weights_path": null,
     "save_weights_after_train": true,
     "codebook_lr": 0.001,
     "non_codebook_lr": 0.0001,
-    "output_folder": "output/base_experiment_resnet20",
+    "output_dir": "output/base_experiment_resnet20",
     "codebooks":[
         {
             "layer": "layer1[2]",

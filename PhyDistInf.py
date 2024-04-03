@@ -33,6 +33,7 @@ from IPython.display import display
 from ipywidgets import interactive
 import json
 import sys
+import os
 from codebook_output import CodebookOutput
 import cifar_resnet
 import imagenet_resnet
@@ -65,11 +66,11 @@ class StopCompute(nn.Module):
         res = self.inner(x)
         raise Exception(res)
     
-def cifar_resnet_loader_generator(model_name, pretrained_weights_path=None):
+def cifar_resnet_loader_generator(model_name, pretrained_weights_path=None, num_classes=10):
     def load_pretrained_resnet():
         device = torch.device('cuda')
         # rn = cifar_resnet20()
-        rn = eval(f'cifar_resnet.cifar_{model_name}')()
+        rn = eval(f'cifar_resnet.cifar_{model_name}')(num_classes=num_classes)
         rn = rn.to(device)
         def remove_module_prefix(d):
             res = dict()
@@ -78,7 +79,10 @@ def cifar_resnet_loader_generator(model_name, pretrained_weights_path=None):
             return res
         if pretrained_weights_path is not None:
             model_dict = torch.load(pretrained_weights_path)
-            rn.load_state_dict(remove_module_prefix(model_dict['state_dict']))
+            if num_classes == 10:
+                rn.load_state_dict(remove_module_prefix(model_dict['state_dict']))
+            elif num_classes == 100:
+                rn.load_state_dict(model_dict)
         return rn
     return load_pretrained_resnet
 
@@ -383,14 +387,13 @@ if __name__ == '__main__':
     BATCH_SIZE = json_data["batch_size"]
     model_name = json_data["model"]
 
-    normalize = torchvision.transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
-                                        std=[0.2023, 0.1994, 0.2010])
-    transform = torchvision.transforms.Compose([
-        torchvision.transforms.ToTensor(),
-        normalize
-    ])
-
-    if dataset == 'cifar10': 
+    if dataset == 'cifar10':
+        normalize = torchvision.transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
+                                    std=[0.2023, 0.1994, 0.2010])
+        transform = torchvision.transforms.Compose([
+            torchvision.transforms.ToTensor(),
+            normalize
+        ])
         cifar10_train = torchvision.datasets.CIFAR10('dataset/cifar10', train=True, download=True, transform=transform)
         cifar10_test = torchvision.datasets.CIFAR10('dataset/cifar10', train=False, download=True, transform=transform)
         cifar10_train_dataloader = DataLoader(cifar10_train, batch_size=BATCH_SIZE, shuffle=True, num_workers=16)
@@ -398,6 +401,24 @@ if __name__ == '__main__':
 
         train_dl = cifar10_train_dataloader
         valid_dl = cifar10_test_dataloader
+    
+    if dataset == 'cifar100':
+        CIFAR100_TRAIN_MEAN = (0.5070751592371323, 0.48654887331495095, 0.4409178433670343)
+        CIFAR100_TRAIN_STD = (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
+        transform = torchvision.transforms.Compose([
+            torchvision.transforms.RandomCrop(32, padding=4),
+            torchvision.transforms.RandomHorizontalFlip(),
+            torchvision.transforms.RandomRotation(15),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize(CIFAR100_TRAIN_MEAN, CIFAR100_TRAIN_STD)
+        ])
+        cifar100_train = torchvision.datasets.CIFAR100('dataset/cifar100', train=True, download=True, transform=transform)
+        cifar100_test = torchvision.datasets.CIFAR100('dataset/cifar100', train=False, download=True, transform=transform)
+        cifar100_train_dataloader = DataLoader(cifar100_train, batch_size=BATCH_SIZE, shuffle=True, num_workers=16)
+        cifar100_test_dataloader = DataLoader(cifar100_test, batch_size=BATCH_SIZE, num_workers=16)
+
+        train_dl = cifar100_train_dataloader
+        valid_dl = cifar100_test_dataloader
 
     if dataset == 'imagenet':
         # todo: load actual imagenet
@@ -418,10 +439,10 @@ if __name__ == '__main__':
     codebook_lr = json_data['codebook_lr']
     non_codebook_lr = json_data['non_codebook_lr']
 
-    output_folder = json_data['output_folder']
-    pathlib.Path(output_folder).mkdir(parents=True, exist_ok=True)
+    output_dir = json_data['output_dir']
+    pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    reference_pretrained_weights_path = json_data["reference_pretrained_weights_path"]
+    reference_pretrained_weights_dir = os.path.join(json_data['reference_pretrained_weights_dir'], json_data['dataset'], json_data['model']) + ".pth"
 
     codebook_training_data = []
 
@@ -439,7 +460,9 @@ if __name__ == '__main__':
         )
 
     if dataset == 'cifar10':
-        resnet_with_codebook = create_resnet_with_codebook(cifar_resnet_loader_generator(model_name, reference_pretrained_weights_path), PSNR, codebook_training_data, train_dl)
+        resnet_with_codebook = create_resnet_with_codebook(cifar_resnet_loader_generator(model_name, reference_pretrained_weights_dir), PSNR, codebook_training_data, train_dl)
+    elif dataset == 'cifar100':
+        resnet_with_codebook = create_resnet_with_codebook(cifar_resnet_loader_generator(model_name, reference_pretrained_weights_dir, num_classes=100), PSNR, codebook_training_data, train_dl)
     else:
         resnet_with_codebook = create_resnet_with_codebook(imagenet_resnet_loader_generator(model_name), PSNR, codebook_training_data, train_dl)
 
@@ -483,7 +506,10 @@ if __name__ == '__main__':
     measures['codebook_model']['total']['flops'], measures['codebook_model']['total']['params'] = count_ops_and_params(resnet_with_codebook)
     measures['codebook_model']['head']['flops'], measures['codebook_model']['head']['params'] = count_ops_and_params(resnet_with_codebook, ignore_list=tail_modules)
 
-    unmodified_model = cifar_resnet_loader_generator(model_name, reference_pretrained_weights_path)()
+    if dataset == "cifar10":
+        unmodified_model = cifar_resnet_loader_generator(model_name, reference_pretrained_weights_dir)()
+    elif dataset == "cifar100":
+        unmodified_model = cifar_resnet_loader_generator(model_name, reference_pretrained_weights_dir, num_classes=100)()
     measures['unmodified_model']['acc'] = evaluate_codebook_model(unmodified_model, valid_dl, -1) * 100.0
     measures['unmodified_model']['total']['flops'], measures['unmodified_model']['total']['params'] = count_ops_and_params(unmodified_model)
     measures['unmodified_model']['head']['flops'], measures['unmodified_model']['head']['params'] = count_ops_and_params(unmodified_model, ignore_list=tail_modules)
@@ -522,12 +548,12 @@ if __name__ == '__main__':
         'best_acc': best_acc
     }
 
-    with open(output_folder + '/training_data.json', 'w') as outfile:
+    with open(output_dir + '/training_data.json', 'w') as outfile:
         json.dump(training_data, outfile)
 
-    with open(output_folder + '/measures.json', 'w') as outfile:
+    with open(output_dir + '/measures.json', 'w') as outfile:
         json.dump(measures, outfile, indent=4)
 
     if save_weights_after_train:
-        torch.save(resnet_with_codebook.state_dict(), f'{output_folder}/model.pth')
+        torch.save(resnet_with_codebook.state_dict(), f'{output_dir}/model.pth')
     

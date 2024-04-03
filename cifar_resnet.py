@@ -147,28 +147,28 @@ class ModifiedResnet(ResNet):
 
         return out
 
-def cifar_resnet20():
-    return ModifiedResnet(ModifiedBasicBlock, [3, 3, 3])
+def cifar_resnet20(num_classes=10):
+    return ModifiedResnet(ModifiedBasicBlock, [3, 3, 3], num_classes=num_classes)
 
 
-def cifar_resnet32():
-    return ModifiedResnet(ModifiedBasicBlock, [5, 5, 5])
+def cifar_resnet32(num_classes=10):
+    return ModifiedResnet(ModifiedBasicBlock, [5, 5, 5], num_classes=num_classes)
 
 
-def cifar_resnet44():
-    return ModifiedResnet(ModifiedBasicBlock, [7, 7, 7])
+def cifar_resnet44(num_classes=10):
+    return ModifiedResnet(ModifiedBasicBlock, [7, 7, 7], num_classes=num_classes)
 
 
-def cifar_resnet56():
-    return ModifiedResnet(ModifiedBasicBlock, [9, 9, 9])
+def cifar_resnet56(num_classes=10):
+    return ModifiedResnet(ModifiedBasicBlock, [9, 9, 9], num_classes=num_classes)
 
 
-def cifar_resnet110():
-    return ModifiedResnet(ModifiedBasicBlock, [18, 18, 18])
+def cifar_resnet110(num_classes=10):
+    return ModifiedResnet(ModifiedBasicBlock, [18, 18, 18], num_classes=num_classes)
 
 
-def cifar_resnet1202():
-    return ModifiedResnet(ModifiedBasicBlock, [200, 200, 200])
+def cifar_resnet1202(num_classes=10):
+    return ModifiedResnet(ModifiedBasicBlock, [200, 200, 200], num_classes=num_classes)
 
 
 def test(net):
