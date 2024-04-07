@@ -31,10 +31,13 @@ class Codebook(nn.Module):
         return x @ self.embedding.T / math.sqrt(self.latent_dim)
     
     def send_over_channel(self, x):
+        modulated = self.mod.modulate(x)
         # self.transmit_event.record()
-        ret = self.mod.demodulate(self.mod.awgn(self.mod.modulate(x)))
+        # torch.save(modulated, ".temp/latent.pth")
+        received = self.mod.awgn(modulated)
         # self.receive_event.record()
-        return ret
+        demodulated = self.mod.demodulate(received)
+        return demodulated
     
     def construct_noise(self, samples):
         x = samples.argmax(dim=-1)

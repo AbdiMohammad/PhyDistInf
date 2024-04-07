@@ -442,7 +442,7 @@ if __name__ == '__main__':
     output_dir = json_data['output_dir']
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    reference_pretrained_weights_dir = os.path.join(json_data['reference_pretrained_weights_dir'], json_data['dataset'], json_data['model']) + ".pth"
+    reference_pretrained_weights_path = os.path.join(json_data['reference_pretrained_weights_dir'], dataset, model_name) + ".pth"
 
     codebook_training_data = []
 
@@ -460,9 +460,9 @@ if __name__ == '__main__':
         )
 
     if dataset == 'cifar10':
-        resnet_with_codebook = create_resnet_with_codebook(cifar_resnet_loader_generator(model_name, reference_pretrained_weights_dir), PSNR, codebook_training_data, train_dl)
+        resnet_with_codebook = create_resnet_with_codebook(cifar_resnet_loader_generator(model_name, reference_pretrained_weights_path), PSNR, codebook_training_data, train_dl)
     elif dataset == 'cifar100':
-        resnet_with_codebook = create_resnet_with_codebook(cifar_resnet_loader_generator(model_name, reference_pretrained_weights_dir, num_classes=100), PSNR, codebook_training_data, train_dl)
+        resnet_with_codebook = create_resnet_with_codebook(cifar_resnet_loader_generator(model_name, reference_pretrained_weights_path, num_classes=100), PSNR, codebook_training_data, train_dl)
     else:
         resnet_with_codebook = create_resnet_with_codebook(imagenet_resnet_loader_generator(model_name), PSNR, codebook_training_data, train_dl)
 
@@ -507,9 +507,9 @@ if __name__ == '__main__':
     measures['codebook_model']['head']['flops'], measures['codebook_model']['head']['params'] = count_ops_and_params(resnet_with_codebook, ignore_list=tail_modules)
 
     if dataset == "cifar10":
-        unmodified_model = cifar_resnet_loader_generator(model_name, reference_pretrained_weights_dir)()
+        unmodified_model = cifar_resnet_loader_generator(model_name, reference_pretrained_weights_path)()
     elif dataset == "cifar100":
-        unmodified_model = cifar_resnet_loader_generator(model_name, reference_pretrained_weights_dir, num_classes=100)()
+        unmodified_model = cifar_resnet_loader_generator(model_name, reference_pretrained_weights_path, num_classes=100)()
     measures['unmodified_model']['acc'] = evaluate_codebook_model(unmodified_model, valid_dl, -1) * 100.0
     measures['unmodified_model']['total']['flops'], measures['unmodified_model']['total']['params'] = count_ops_and_params(unmodified_model)
     measures['unmodified_model']['head']['flops'], measures['unmodified_model']['head']['params'] = count_ops_and_params(unmodified_model, ignore_list=tail_modules)
