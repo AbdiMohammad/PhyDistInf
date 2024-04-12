@@ -5,6 +5,7 @@ import random
 import numpy as np
 import pathlib
 import argparse
+import threading
 
 import torch
 import torch.nn as nn
@@ -15,13 +16,38 @@ from torch.profiler import profile, record_function, ProfilerActivity
 
 from PhyDistInf import CodebookTrainData, cifar_resnet_loader_generator, create_resnet_with_codebook, get_codebook_params_and_ids, evaluate_codebook_model
 from PhyDistInf import ConstantCoefficient, LinearCoefficient
+from PhyDistInf import evaluate_codebook_model
 from codebook_output import CodebookOutput
 
 from bottlefit import create_resnet_with_bottlefit
 
-def benchmark_model(model, dataloader, method, latent_layer_name=None, save_dir=None, save_inference_time=True, save_latent=False):
+from jtop import jtop
+
+
+class PowerLogger():
+    def __init__(self):
+        self.power = []
+        self.power_thread = threading.Thread(target=self.power_worker, daemon=True)
+        self.power_thread.start()
+
+    def power_worker(self):
+        with jtop() as jetson:
+            while jetson.ok():#spin=True):
+                # print(jetson.power['tot']['power'])
+                self.power.append(jetson.power['tot']['power'])
+    
+    def clear_power(self):
+    	self.power = []
+
+def benchmark_model(model, dataloader, method, latent_layer_name=None, save_dir=None, save_inference_time=True, save_power=False, save_latent=False):
     device = next(model.parameters()).device
 
+    # GPU Warm-up
+    with torch.no_grad():
+        for xs, _ in dataloader:
+            xs = xs.to(device)
+            model(xs)
+    
     if args.method == "SC":
         exec(f"model.{latent_layer_name} = SplitLayer(model.{latent_layer_name})")
     elif "BF" in args.method:
@@ -42,14 +68,25 @@ def benchmark_model(model, dataloader, method, latent_layer_name=None, save_dir=
                 torch.save(latent, os.path.join(save_dir_latent, f"{i}.pth"))
                 # print(latent.shape)
 
+    if save_power:
+        power_logger = PowerLogger()
+        with torch.no_grad():
+            for repretitions in range(5):
+                for xs, _ in dataloader:
+                    try:
+                        xs = xs.to(device)
+                        model(xs)
+                    except Exception as e:
+                        continue
+
+        power = torch.Tensor(power_logger.power)
+        print(f"power consumption averaged over {len(power)}: {power.mean()}")
+        pathlib.Path(save_dir).mkdir(parents=True, exist_ok=True)
+        torch.save(power, os.path.join(save_dir, "power_consumption.pth"))
+        return
+
     start_event, end_event = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
     head_inference_time, tail_inference_time, total_inference_time = [], [], []
-
-    # GPU Warm-up
-    with torch.no_grad():
-        for xs, _ in dataloader:
-            xs = xs.to(device)
-            _ = model(xs)
 
     with torch.no_grad():
         for repretitions in range(10):
@@ -83,6 +120,10 @@ def benchmark_model(model, dataloader, method, latent_layer_name=None, save_dir=
     head_inference_time = torch.Tensor(head_inference_time)
     tail_inference_time = torch.Tensor(tail_inference_time)
     total_inference_time = torch.Tensor(total_inference_time)
+
+    print(f"head inference time averaged over {len(head_inference_time)}: {head_inference_time.mean()}")
+    print(f"tail inference time averaged over {len(tail_inference_time)}: {tail_inference_time.mean()}")
+    print(f"total inference time averaged over {len(total_inference_time)}: {total_inference_time.mean()}")
 
     if save_inference_time:
         pathlib.Path(save_dir).mkdir(parents=True, exist_ok=True)
@@ -119,11 +160,12 @@ class SplitLayer(nn.Module):
     def __init__(self, split_layer):
         super().__init__()
         self.split_layer = split_layer
-        self.split_event = torch.cuda.Event(enable_timing=True)
+        # self.split_event = torch.cuda.Event(enable_timing=True)
     
     def forward(self, x):
         res = self.split_layer(x)
-        self.split_event.record()
+        # raise Exception()
+        # self.split_event.record()
         # torch.save(res[:, torch.randint(high=res.shape[1], size=(self.layer_width,)), :, :], ".temp/latent.pth")
         # torch.save(res, ".temp/latent.pth")
         return res
@@ -235,11 +277,12 @@ if __name__ == "__main__":
         model = create_resnet_with_bottlefit(model, json_data['codebooks'][0]['layer'], int(args.method.split('-')[1]))
         model.load_state_dict(torch.load(os.path.join(json_data['output_dir'], f"{model_name}_BF-{args.method.split('-')[1]}.pth"))['state_dict'])
 
-    head_inference_time, tail_inference_time, total_inference_time = benchmark_model(model, valid_dl, args.method, latent_layer_name=json_data['codebooks'][0]['layer'], save_dir=os.path.join(json_data['output_dir'], f"{args.method}_{model_name}"))
+    benchmark_model(model, valid_dl, args.method, latent_layer_name=json_data['codebooks'][0]['layer'], save_dir=os.path.join(json_data['output_dir'], f"{args.method}_{model_name}"), save_power=True)
 
-    print(f"head inference time averaged over {len(head_inference_time)}: {head_inference_time.mean()}")
-    print(f"tail inference time averaged over {len(tail_inference_time)}: {tail_inference_time.mean()}")
-    print(f"total inference time averaged over {len(total_inference_time)}: {total_inference_time.mean()}")
-
+    # with open(os.path.join(json_data['output_dir'], "measures.json")) as measures_file:
+    #     measures = json.load(measures_file)
+    
+    # print(evaluate_codebook_model(model, valid_dl, 0))
+        
     # profile_model(resnet_with_codebook, valid_dl)
 

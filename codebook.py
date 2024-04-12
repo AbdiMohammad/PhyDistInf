@@ -26,15 +26,31 @@ class Codebook(nn.Module):
 
         # self.transmit_event = torch.cuda.Event(enable_timing=True)
         # self.receive_event = torch.cuda.Event(enable_timing=True)
+        
+        # self.input_index = 0
+
+        # from torch.utils.data import TensorDataset
+        # from torch.utils.data import DataLoader
+        # latent = []
+        # for i in range(10000):
+        #     latent.append(torch.load(f".temp/Rcv_nlos_PhyDistInf_resnet56/{i}.pth"))
+        # latent = torch.stack(latent, dim=0)
+        # latent_ds = TensorDataset(latent)
+        # self.latent_dl = DataLoader(latent_ds, batch_size=1024, num_workers=16)
+        # self.batch_iter = iter(self.latent_dl)
     
     def compute_score(self, x):
         return x @ self.embedding.T / math.sqrt(self.latent_dim)
     
     def send_over_channel(self, x):
         modulated = self.mod.modulate(x)
+        # raise Exception()
         # self.transmit_event.record()
         # torch.save(modulated, ".temp/latent.pth")
         received = self.mod.awgn(modulated)
+        # received = next(self.batch_iter)[0].view(-1, 2).to('cuda')
+        # received = torch.load(f".temp/Rcv/{self.input_index}.pth", map_location=torch.device("cuda"))
+        # self.input_index += 1
         # self.receive_event.record()
         demodulated = self.mod.demodulate(received)
         return demodulated
